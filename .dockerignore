@@ -1,0 +1,15 @@
+# Артефакты сборки и локальные данные — не нужны в контексте образа.
+tasktracker
+*.db
+*.db-wal
+*.db-shm
+
+# Окружение и документация.
+.env
+.git
+.gitignore
+README.md
+
+# IDE / прочее.
+.vscode
+.idea
