@@ -106,7 +106,7 @@ func (h *Handler) handleCommand(user *domain.User, msg *tgbotapi.Message) {
 // ensureUser регистрирует/обновляет пользователя и определяет его роль.
 func (h *Handler) ensureUser(msg *tgbotapi.Message) (*domain.User, error) {
 	role := domain.RoleEmployee
-	if h.cfg.BossIDs[msg.From.ID] {
+	if h.cfg.IsBoss(msg.From.ID, msg.From.UserName) {
 		role = domain.RoleBoss
 	}
 	name := strings.TrimSpace(msg.From.FirstName + " " + msg.From.LastName)

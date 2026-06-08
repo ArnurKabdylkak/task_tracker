@@ -11,21 +11,34 @@ import (
 
 // Config — настройки бота, читаются из переменных окружения.
 type Config struct {
-	Token        string
-	BossIDs      map[int64]bool
-	Location     *time.Location
-	DBPath       string
-	ReminderHour int
-	ReminderMin  int
-	FollowupHour int
-	FollowupMin  int
+	Token         string
+	BossIDs       map[int64]bool  // начальники по числовому Telegram ID
+	BossUsernames map[string]bool // начальники по username (без @, в нижнем регистре)
+	Location      *time.Location
+	DBPath        string
+	ReminderHour  int
+	ReminderMin   int
+	FollowupHour  int
+	FollowupMin   int
+}
+
+// IsBoss сообщает, является ли пользователь начальником — по ID или по username.
+// ID надёжнее (не меняется), username — удобный псевдоним; достаточно совпадения
+// по любому из них.
+func (c *Config) IsBoss(tgID int64, username string) bool {
+	if c.BossIDs[tgID] {
+		return true
+	}
+	u := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(username), "@"))
+	return u != "" && c.BossUsernames[u]
 }
 
 // Load читает конфигурацию из окружения.
 //
 //	BOT_TOKEN      — токен бота от @BotFather (обязательно)
-//	BOSS_IDS       — Telegram ID начальников через запятую (напр. "123,456")
-//	BOT_TZ         — таймзона (по умолчанию Europe/Moscow)
+//	BOSS_IDS       — начальники через запятую: числовые Telegram ID и/или
+//	                 @username (напр. "123,@ivan,olga")
+//	BOT_TZ         — таймзона (по умолчанию Asia/Almaty)
 //	DB_PATH        — путь к файлу БД (по умолчанию tasks.db)
 //	REMINDER_TIME  — время утреннего напоминания HH:MM (по умолчанию 10:00)
 //	FOLLOWUP_TIME  — время напоминания не отписавшимся HH:MM (по умолчанию 14:00)
@@ -35,22 +48,25 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("не задан BOT_TOKEN")
 	}
 
+	// BOSS_IDS принимает и числовые ID, и @username. Числа — это ID,
+	// всё остальное трактуется как username (нормализуется без @ и в нижнем регистре).
 	bossIDs := map[int64]bool{}
+	bossUsernames := map[string]bool{}
 	for _, p := range strings.Split(os.Getenv("BOSS_IDS"), ",") {
 		p = strings.TrimSpace(p)
 		if p == "" {
 			continue
 		}
-		id, err := strconv.ParseInt(p, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("неверный BOSS_IDS %q: %w", p, err)
+		if id, err := strconv.ParseInt(p, 10, 64); err == nil {
+			bossIDs[id] = true
+			continue
 		}
-		bossIDs[id] = true
+		bossUsernames[strings.ToLower(strings.TrimPrefix(p, "@"))] = true
 	}
 
 	tz := os.Getenv("BOT_TZ")
 	if tz == "" {
-		tz = "Europe/Moscow"
+		tz = "Asia/Almaty"
 	}
 	loc, err := time.LoadLocation(tz)
 	if err != nil {
@@ -66,14 +82,15 @@ func Load() (*Config, error) {
 	fh, fm := parseHM(os.Getenv("FOLLOWUP_TIME"), 14, 0)
 
 	return &Config{
-		Token:        token,
-		BossIDs:      bossIDs,
-		Location:     loc,
-		DBPath:       dbPath,
-		ReminderHour: hh,
-		ReminderMin:  mm,
-		FollowupHour: fh,
-		FollowupMin:  fm,
+		Token:         token,
+		BossIDs:       bossIDs,
+		BossUsernames: bossUsernames,
+		Location:      loc,
+		DBPath:        dbPath,
+		ReminderHour:  hh,
+		ReminderMin:   mm,
+		FollowupHour:  fh,
+		FollowupMin:   fm,
 	}, nil
 }
 

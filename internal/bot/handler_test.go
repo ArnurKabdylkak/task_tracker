@@ -109,6 +109,30 @@ func TestBossCommandDeniedForEmployee(t *testing.T) {
 	}
 }
 
+// Начальник, назначенный по username (а не по ID), тоже получает доступ.
+func TestBossByUsername(t *testing.T) {
+	store, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	cfg := &config.Config{
+		BossUsernames: map[string]bool{"chief": true},
+		Location:      time.UTC,
+	}
+	sender := &captureSender{}
+	h := NewHandler(sender, store, cfg)
+
+	// Сообщение от пользователя с ником @chief, но другим ID.
+	m := cmdFrom(555, "pending", "")
+	m.From.UserName = "Chief" // регистр не важен
+	h.handleMessage(m)
+
+	if strings.Contains(sender.last(), "только начальнику") {
+		t.Fatalf("начальнику по нику отказано в доступе: %q", sender.last())
+	}
+}
+
 // Та же команда у начальника отрабатывает штатно.
 func TestBossCommandAllowedForBoss(t *testing.T) {
 	h, sender, _ := newTestHandler(t, 7) // 7 — начальник
